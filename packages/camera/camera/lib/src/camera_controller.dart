@@ -338,11 +338,14 @@ class CameraController extends ValueNotifier<CameraValue> {
     try {
       final initializeCompleter = Completer<CameraInitializedEvent>();
 
-      _deviceOrientationSubscription ??= CameraPlatform.instance
-          .onDeviceOrientationChanged()
-          .listen((DeviceOrientationChangedEvent event) {
-            value = value.copyWith(deviceOrientation: event.orientation);
-          });
+     _deviceOrientationSubscription ??= CameraPlatform.instance
+    .onDeviceOrientationChanged()
+    .listen((DeviceOrientationChangedEvent event) {
+      // Check if disposed before updating value
+      if (!_isDisposed) {
+        value = value.copyWith(deviceOrientation: event.orientation);
+      }
+    });
 
       _cameraId = await CameraPlatform.instance.createCameraWithSettings(
         description,
@@ -357,20 +360,28 @@ class CameraController extends ValueNotifier<CameraValue> {
         }),
       );
 
-      unawaited(
-        CameraPlatform.instance.onCameraError(_cameraId).first.then((
-          CameraErrorEvent event,
-        ) {
-          value = value.copyWith(errorDescription: event.description);
-        }),
-      );
+     unawaited(
+  CameraPlatform.instance.onCameraError(_cameraId).first.then((
+    CameraErrorEvent event,
+  ) {
+    // Check if disposed before updating value
+    if (!_isDisposed) {
+      value = value.copyWith(errorDescription: event.description);
+    }
+  }),
+);
 
-      await CameraPlatform.instance.initializeCamera(
-        _cameraId,
-        imageFormatGroup: imageFormatGroup ?? ImageFormatGroup.unknown,
-      );
+    await CameraPlatform.instance.initializeCamera(
+  _cameraId,
+  imageFormatGroup: imageFormatGroup ?? ImageFormatGroup.unknown,
+);
 
-      value = value.copyWith(
+// Check if disposed during initialization before setting final state
+if (_isDisposed) {
+  return;
+}
+
+value = value.copyWith(
         isInitialized: true,
         description: description,
         previewSize: await initializeCompleter.future.then(
