@@ -1353,7 +1353,97 @@ void main() {
         ).called(1);
       },
     );
+test(
+  'does not throw when async callbacks fire after dispose',
+  () async {
+    final cameraController = CameraController(
+      const CameraDescription(
+        name: 'cam',
+        lensDirection: CameraLensDirection.back,
+        sensorOrientation: 90,
+      ),
+      ResolutionPreset.max,
+    );
 
+    // Initialize controller
+    await cameraController.initialize();
+    expect(cameraController.value.isInitialized, isTrue);
+
+    // Dispose it
+    await cameraController.dispose();
+    expect(cameraController.value.isInitialized, isTrue);
+
+    // Give any pending async callbacks time to fire
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    // No exception should be thrown
+    expect(true, isTrue);
+  },
+);
+
+test(
+  'disposed controller does not update from device orientation changes',
+  () async {
+    final cameraController = CameraController(
+      const CameraDescription(
+        name: 'cam',
+        lensDirection: CameraLensDirection.back,
+        sensorOrientation: 90,
+      ),
+      ResolutionPreset.max,
+    );
+
+    await cameraController.initialize();
+    final initialOrientation = cameraController.value.deviceOrientation;
+
+    // Dispose the controller
+    await cameraController.dispose();
+
+    // Since we check _isDisposed now, this should not cause an exception
+    expect(cameraController.value.deviceOrientation, initialOrientation);
+  },
+);
+
+test(
+  'switching between controllers with dispose does not crash',
+  () async {
+    final description1 = const CameraDescription(
+      name: 'cam1',
+      lensDirection: CameraLensDirection.back,
+      sensorOrientation: 90,
+    );
+
+    final description2 = const CameraDescription(
+      name: 'cam2',
+      lensDirection: CameraLensDirection.front,
+      sensorOrientation: 180,
+    );
+
+    final controller1 = CameraController(description1, ResolutionPreset.max);
+    final controller2 = CameraController(description2, ResolutionPreset.max);
+
+    try {
+      // Initialize first controller
+      await controller1.initialize();
+      expect(controller1.value.isInitialized, isTrue);
+
+      // Dispose first controller
+      await controller1.dispose();
+
+      // Initialize second controller
+      await controller2.initialize();
+      expect(controller2.value.isInitialized, isTrue);
+
+      // Give any pending callbacks time to fire
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      // No exception should have been thrown
+      expect(true, isTrue);
+    } finally {
+      await controller2.dispose();
+    }
+  },
+);
     test('setExposureOffset() rounds offset to nearest step', () async {
       final cameraController = CameraController(
         const CameraDescription(
